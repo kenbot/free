@@ -1,8 +1,9 @@
-package free
+package free.interaction
 
 import scalaz._
 import Scalaz._
 import Free._
+import scala.annotation.tailrec
 
 sealed trait Direction
 case object Forward extends Direction
@@ -85,31 +86,13 @@ object Interpret {
   }
 }
 
-  /*
-interpret :: Program r -> Game r
-interpret prog = case prog of
-    Free (Look dir g) -> do
-        img <- collectImage dir
-        interpret (g img)
-    Free (Fire dir next) -> do
-        sendBullet dir
-        interpret next
-    Free (ReadLine g) -> do
-        str <- getChatLine
-        interpret (g str)
-    Free (WriteLine s g) ->
-        putChatLine s
-        interpret (g True)
-    Pure r -> return r
-   */
-  
 
 object Program {
   import Interaction._
   
   def reactAngrily: Program[Unit] = for {
     str <- readLine
-    _ <- when[Program](str == "no") {
+    _ <- (str == "no").whenM {
       for {
         _ <- fire(Forward)
         _ <- writeLine("Take that!")
@@ -122,7 +105,8 @@ object Program {
 
   
   def when[M[_]](p: Boolean)(then: => M[Unit])(implicit m: Monad[M]): M[Unit] = if (p) then else m.pure(())
-  def forever[M[_]: Monad, A, B](ma: M[A]): M[B] = ma.flatMap(_ => forever(ma))
+  
+  def forever[M[_]: Monad, A, B](ma: M[A]): M[B] = ma >> forever(ma)
 
   
 }

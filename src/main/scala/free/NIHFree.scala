@@ -1,8 +1,7 @@
-package free
+package free.nih
 
 import scalaz._
 import Scalaz._
-
 import NIHFree._
 
 sealed trait Action[+A]
@@ -26,8 +25,6 @@ object Actions {
   def bell: Program[Unit] = liftF(Bell(()))
   
   
-  
-  
   val interpreter = new (Action ~> Id) {
     def apply[A](action: Action[A]): A = action match { 
       case Bell(next) => println("BELL!"); next
@@ -43,21 +40,29 @@ object NIHFree {
   implicit def monad[F[+_]](implicit F: Functor[F]): Monad[({type f[x] = NIHFree[F,x]})#f] = new Monad[({type f[x] = NIHFree[F,x]})#f] {
     def point[A](a: => A): NIHFree[F,A] = NIHPure[F, A](a)
     
-    def bind[A, B](free: NIHFree[F,A])(f: A => NIHFree[F,B]): NIHFree[F,B] = free match {
-      case NIHSuspend(ffa) => NIHSuspend(F.map(ffa) { fr => bind(fr)(f) }) // NIHSuspend(ffa.map(_ flatmap f))
-      case NIHPure(a) => f(a)
-    }
+    def bind[A, B](free: NIHFree[F,A])(f: A => NIHFree[F,B]): NIHFree[F,B] = 
+      free flatMap f
   }
   
-  def liftF[F[_], A](value: => F[A])(implicit F: Functor[F]): NIHFree[F, A] = NIHSuspend(value map NIHPure.apply)
-  
-  
+  def liftF[F[_]: Functor, A](fa: => F[A]): NIHFree[F, A] = 
+    NIHSuspend(fa map NIHPure.apply)
 }
 
 sealed trait NIHFree[F[_], A] {
-  final def runM[M[_]](f: F[NIHFree[F, A]] => M[NIHFree[F, A]])(implicit F: Functor[F], M: Monad[M]): M[A] = this match {
-    case NIHSuspend(ffa) => ??? //M.bind(ffa)(f)
-    case NIHPure(a) => M.pure(a)
+  
+  def flatMap[B](f: A => NIHFree[F, B])(implicit F: Functor[F]): NIHFree[F, B] = this match {
+    case NIHSuspend(ffa) => NIHSuspend(ffa.map(_ flatMap f))
+    case NIHPure(a) => f(a)
+  }
+  
+  def map[B](f: A => B)(implicit functor: Functor[F]): NIHFree[F, B] = this match {
+    case NIHSuspend(ffa) => NIHSuspend(ffa.map(_ map f))
+    case NIHPure(a) => NIHPure(f(a))
+  }
+  
+  final def runM[M[_]](f: F[NIHFree[F, A]] => M[NIHFree[F, A]])(implicit functor: Functor[F], monad: Monad[M]): M[A] = this match {
+    case NIHSuspend(ffa) => f(ffa).flatMap(_ runM f)
+    case NIHPure(a) => monad.pure(a)
   }
 }
 case class NIHSuspend[F[_], A](f: F[NIHFree[F, A]]) extends NIHFree[F, A]
