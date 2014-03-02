@@ -7,6 +7,18 @@ import scalaz.Free._
 import scalaz._
 import Scalaz._
 
+
+sealed trait Move[+A]
+case class Accelerate[A](next: A) extends Move[A] 
+//case class RotateGun[A](angle: Angle, next: A) extends Move[A]
+case class RotateTank[A](angle: Angle, next: A) extends Move[A]
+case class Delay[A](next: A) extends Move[A]
+case class Fire[A](next: A) extends Move[A]
+case class FindNearestTank[A](onFoundTank: Tank => A) extends Move[A]
+case class AngleTo[A](toPos: Vec, onAngle: Angle => A) extends Move[A]
+case class At[A](pos: Vec, at: Boolean => A) extends Move[A]
+  
+
 object Move {
   implicit def functor: Functor[Move] =  new Functor[Move] {
     def map[A,B](move: Move[A])(f: A => B): Move[B] = move match {
@@ -21,16 +33,7 @@ object Move {
   }
 }
 
-sealed trait Move[+A]
-case class Accelerate[A](next: A) extends Move[A] 
-//case class RotateGun[A](angle: Angle, next: A) extends Move[A]
-case class RotateTank[A](angle: Angle, next: A) extends Move[A]
-case class Delay[A](next: A) extends Move[A]
-case class Fire[A](next: A) extends Move[A]
-case class FindNearestTank[A](onFoundTank: Tank => A) extends Move[A]
-case class AngleTo[A](toPos: Vec, onAngle: Angle => A) extends Move[A]
-case class At[A](pos: Vec, at: Boolean => A) extends Move[A]
-  
+
 object TankMoves {
 
   type AI[A] = Free[Move, A]
@@ -58,7 +61,7 @@ object TankMoves {
   def moveTo(pos: Vec): AI[Unit] = for {
     angle <- angleTo(pos)
     _ <- rotateTank(angle)
-    _ <- accelerate
+    _ <-  accelerate
   } yield ()
   
   def searchAndDestroy: AI[Unit] = for {
@@ -68,25 +71,36 @@ object TankMoves {
   } yield ()
 }
 
-
-
-object TankAiInterpreter {
-  import TankMoves._
+trait MoveInterpreter extends ((TankWorld, Tank) => TankWorld) {
   
-  def interpret[A](tank: Tank, ai: AI[A], world: TankWorld): (AI[A], TankWorld) = {
-    def updateTank(f: Tank => Tank): TankWorld = world withTank f(tank)
-    ai match {
-      case Suspend(move) => move match {
-        case Accelerate(next) => (next, updateTank(_.accelerate))
-        case RotateTank(angle, next) => (next, updateTank(_ rotate angle))
-        case Delay(next) => (next, world)
-        case Fire(next) => (next, world)
-        case FindNearestTank(onFoundTank) => (onFoundTank(???), world)
-        case AngleTo(toPos, onAngle) => (onAngle(tank.pos angleTo toPos), world)
-        case At(pos, at) => (at(false), world)
-      }
-      case Return(_) => (ai, world)
-    }
+  final def apply(world: TankWorld, tank: Tank): TankWorld = {
+    tank.ai.resume.fold(interpretMove(world, tank, _), _ => world)
   }
   
+  protected def interpretMove(world: TankWorld, tank: Tank, move: Move[AI[Unit]]): TankWorld
+    
+  protected def updateAI(world: TankWorld, tank: Tank, nextAI: AI[Unit]): TankWorld = {
+    world updateTank (tank withAI nextAI)
+  }
+  
+  protected def updateTank(world: TankWorld, tank: Tank, nextAI: AI[Unit], f: Tank => Tank): TankWorld = {
+    world updateTank f(tank).withAI(nextAI)
+  }
 }
+
+object EasyTankAI extends MoveInterpreter {
+  def interpretMove(world: TankWorld, tank: Tank, move: Move[AI[Unit]]): TankWorld = move match {
+    case Accelerate(next) => updateTank(world, tank, next, _.accelerate)
+    case RotateTank(angle, next) => updateTank(world, tank, next, _ rotate angle)
+    case Delay(next) => println("waiting..."); world
+    case Fire(next) => println("FIRE!"); world
+    case FindNearestTank(onFoundTank) => 
+      val maybeNearest = world tankNearestTo tank
+      val nextAI = maybeNearest.fold(tank.ai)(onFoundTank)
+      updateAI(world, tank, nextAI)
+    case AngleTo(toPos, onAngle) => updateAI(world, tank, onAngle(tank.pos angleTo toPos))
+    case At(pos, at) => updateAI(world, tank, at(tank.pos.distanceTo(pos) <= 0.01))
+  }
+}
+  
+

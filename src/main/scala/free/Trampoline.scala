@@ -43,7 +43,7 @@ object Trampoline extends EvenProgram {
     case a #:: as => Suspend(() => odd(as))
     case Stream.Empty => Return(false)
   }
-  
+
   def runTest(range: Stream[Int]) = even(range).run
 }
 

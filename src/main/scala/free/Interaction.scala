@@ -1,5 +1,6 @@
 package free.interaction
 
+/*
 import scalaz._
 import Scalaz._
 import Free._
@@ -104,9 +105,9 @@ object Program {
 
 
   
-  def when[M[_]](p: Boolean)(then: => M[Unit])(implicit m: Monad[M]): M[Unit] = if (p) then else m.pure(())
+  def when[M[_]](p: Boolean)(then: => M[Unit])(implicit m: Applicative[M]): M[Unit] = if (p) then else m.pure(())
   
   def forever[M[_]: Monad, A, B](ma: M[A]): M[B] = ma >> forever(ma)
 
   
-}
+}*/
