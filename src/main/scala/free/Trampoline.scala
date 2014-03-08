@@ -6,18 +6,6 @@ import Free._
 import scala.concurrent.Future
 
 
-trait EvenProgram {
-  val bigRange = (1 to 10).toStream
-
-  def runTest(range: Stream[Int]): Boolean
-  
-  def main(args: Array[String]): Unit = {
-    val isEven = runTest(bigRange)
-    println(s"Even: evenTest")
-  }
-}
-
-
 object NaughtyRecursion extends EvenProgram {
   
   def odd[A](list: Stream[A]): Boolean = list match {
@@ -33,6 +21,9 @@ object NaughtyRecursion extends EvenProgram {
   def runTest(range: Stream[Int]) = even(range)
 }
 
+
+
+
 object Trampoline extends EvenProgram {
   def odd[A](list: Stream[A]): Trampoline[Boolean] = list match {
     case a #:: as => Suspend(() => even(as))
@@ -46,4 +37,18 @@ object Trampoline extends EvenProgram {
 
   def runTest(range: Stream[Int]) = even(range).run
 }
+
+
+
+trait EvenProgram {
+  val bigRange = (1 to 10).toStream
+
+  def runTest(range: Stream[Int]): Boolean
+  
+  def main(args: Array[String]): Unit = {
+    val isEven = runTest(bigRange)
+    println(s"Even: evenTest")
+  }
+}
+
 

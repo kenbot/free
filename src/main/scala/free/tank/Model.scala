@@ -1,103 +1,164 @@
 package free.tank
 
-import scala.math._
-
-import TankMoves.{AI, AIDone}
+import Moves.{AI, AIDone}
 import scala.collection.SortedMap
 import scala.collection.immutable.TreeMap
 import scala.math.Ordered
+import scala.annotation.tailrec
+import scalaz._
+import Scalaz._
+import scala.reflect.ClassTag
 
-
-object Angle {
-  def degrees(degs: Double) = Angle(degs * Pi / 180.0)
-  val Zero = Angle(0)
-  val Quarter = Angle(Pi/2)
-  val Half = Angle(Pi)
-  val ThreeQuarters = Angle(3*Pi/2)
-  val Full = Angle(2*Pi)
+object EntityId {
+  def Auto = EntityId("[AUTO]")
 }
 
-case class Angle(radians: Double) extends AnyVal {
-  def sin: Double = math.sin(radians)
-  def cos: Double = math.cos(radians)
-  def tan: Double = math.tan(radians)
-  def opposite: Angle = this + Angle.Half
-  def degrees: Double = radians * 180.0 / Pi
-  def +(other: Angle) = Angle(radians + other.radians)
-  def -(other: Angle) = Angle(radians - other.radians)
-  def *(factor: Double) = Angle(radians * factor)
-  def /(factor: Double) = Angle(radians / factor)
-  def normalize = Angle(radians % (2*Pi))
+case class EntityId(name: String) extends AnyVal with Ordered[EntityId] {
+  override def compare(that: EntityId): Int = name compare that.name
 }
 
-
-object Vec {
-  def fromAngle(angle: Angle, length: Double): Vec = Vec(length * angle.cos, length * angle.sin)
-  val Zero = Vec(0,0)
+sealed trait Entity extends Physical with AIControlled {
+  type This <: Entity
+  
+  def id: EntityId
+  def replaceId(newId: EntityId): This
+  final def sameAs(other: Entity): Boolean = other.id == id
 }
 
-case class Vec(x: Double, y: Double) {
-  def angle: Angle = if (x != 0) Angle(atan(y/x)) else Angle(Pi)
-  def length: Double = sqrt(x*x + y*y)
-  def +(vec: Vec) = Vec(x + vec.x, y + vec.y)
-  def -(vec: Vec) = Vec(x - vec.x, y - vec.y)
-  def toTuple: (Double, Double) = (x,y)
-  def between(vec: Vec) = this - vec
-  def distanceTo(pt: Vec) = between(pt).length
-  def angleTo(pt: Vec) = between(pt).angle
+object Missile {
+  val Friction = Percentage.Zero
+  val MaxSpeed = 100.0
+  
+  def fireToward(fromPos: Vec, angle: Angle, speed: Double, range: Double): Missile = {
+    val physics = Physics(angle, fromPos, Vec.fromAngle(angle, speed), Vec.Zero, Friction, MaxSpeed)
+    Missile(EntityId.Auto, physics, range)
+  }
 }
 
-case class TankId(name: String) extends AnyVal with Ordered[TankId] {
-  override def compare(that: TankId): Int = name compare that.name
+case class Missile(id: EntityId, physics: Physics, range: Double) extends Entity {
+  type This = Missile
+  
+  def ai = AIDone
+  def updatePhysics(f: Physics => Physics): Missile = copy(physics = f(physics))
+  def withAI(newAI: AI[Unit]): This = this
+  override def run(constrainPos: Vec => Vec): This = Missile(id, physics run constrainPos, range - vel.length)
+  def replaceId(newId: EntityId): This = copy(id = newId)
+}
+
+trait AIControlled {
+  type This <: AIControlled
+  
+  def ai: AI[Unit]
+  def withAI(newAI: AI[Unit]): This
+}
+
+trait Physical {
+  type This <: Physical
+  
+  def physics: Physics
+  def updatePhysics(f: Physics => Physics): This
+  
+  def run(constrainPos: Vec => Vec): This = updatePhysics(_ run constrainPos)
+  
+  final def pos = physics.pos
+  final def vel = physics.vel
+  final def acc = physics.acc
+  final def facing = physics.facing
+  
+  
+  final def accelerateForward(acc: Double): This = updatePhysics(_ accelerateForward acc)
+  final def distanceTo(other: Physical) = pos distanceTo other.pos
+  final def rotate(by: Angle): This = updatePhysics(_ rotate by)
+  
+}
+
+case class Physics(facing: Angle, pos: Vec, vel: Vec, acc: Vec, friction: Percentage, maxSpeed: Double) {
+  def run(constrainPos: Vec => Vec) = {
+    Physics(facing, constrainPos(pos + vel), constrainVel((vel * frictionMult.amount) + acc), Vec.Zero, friction, maxSpeed)
+  }
+  
+  def accelerateForward(acc: Double): Physics = accelerate(Vec.fromAngle(facing, acc))
+  
+  def accelerate(acc: Vec): Physics = copy(acc = this.acc + acc)
+  
+  def rotate(by: Angle): Physics = copy(facing = facing + by)
+  
+  private def frictionMult = friction.complement
+  
+  private def constrainVel(vel: Vec): Vec = if (vel.length > maxSpeed) vel.withLength(maxSpeed) else vel
 }
 
 object Tank {
-  val Acceleration = 5.0
-  val Friction = 1.0
+  val Acceleration = 3.0
+  val Friction = Percentage(0.5)
+  val GunRange = 10000.0
+  val MissileSpeed = 10.0
+  val MaxSpeed = 100.0
   
-  def apply(id: String, pos: Vec): Tank = 
-    Tank(TankId(id), AIDone, Angle.Zero, Angle.Zero, pos, Vec.Zero, Vec.Zero)
+  def apply(id: String, pos: Vec): Tank = {
+    val physics = Physics(Angle.Zero, pos, Vec.Zero, Vec.Zero, Friction, MaxSpeed)
+    new Tank(EntityId(id), AIDone, physics, Angle.Zero)
+  }  
+  
+  def unapply(e: Entity): Option[Tank] = if (e.isInstanceOf[Tank]) Some(e.asInstanceOf[Tank]) else None
 }
 
 
-case class Tank(id: TankId, ai: AI[Unit], facing: Angle, gunFacing: Angle, pos: Vec, vel: Vec, acc: Vec) {
-  def updatePhysics = Tank(id, ai, facing, gunFacing, pos + vel, vel + acc, Vec.Zero)
+case class Tank(id: EntityId, ai: AI[Unit], physics: Physics, gunAngle: Angle) extends Entity {
 
+  type This = Tank
+
+  def replaceId(newId: EntityId): Tank = copy(id = newId)
+  
+  def gunFacing: Angle = physics.facing + gunAngle
+  
+  def accelerate: Tank = accelerateForward(Tank.Acceleration)
+  
   def withAI(newAI: AI[Unit]): Tank = copy(ai = newAI)
   
-  def distanceTo(other: Tank) = pos distanceTo other.pos
-  def sameTankAs(other: Tank): Boolean = other.id == id
-  def accelerate: Tank = copy(acc = Vec.fromAngle(facing, Tank.Acceleration))
-  def moveTo(newPos: Vec): Tank = copy(pos = newPos)
-  def rotate(a: Angle): Tank = copy(facing = facing + a)
-}
-
-case class TankGame(world: TankWorld, interpreter: MoveInterpreter, frame: Int) {
-  def runFrame = TankGame(world.updatePhysics.updateAI(interpreter), interpreter, frame + 1)
+  def fire = Missile.fireToward(pos, facing, Tank.MissileSpeed, Tank.GunRange)
+  
+  def updatePhysics(f: Physics => Physics): Tank = copy(physics = f(physics))
 }
 
 
-object TankWorld {
-  def apply(tanks: Seq[Tank]): TankWorld = 
-    new TankWorld(TreeMap(tanks.map(t => t.id -> t): _*))
+object World {
+  def apply(bounds: Dim, entities: Seq[Entity]): World = 
+    new World(bounds, TreeMap(entities.map(t => t.id -> t): _*), 1)
 }
 
-class TankWorld private (private val tankMap: SortedMap[TankId, Tank]) {
+
+class World private (dimensions: Dim, private val entityMap: SortedMap[EntityId, Entity], nextId: Int) {
+  lazy val entities: Seq[Entity] = entityMap.values.toIndexedSeq
+   
+  val bounds = Rect(0.0, 0.0, dimensions.width, dimensions.height)
   
-  lazy val tanks: Seq[Tank] = tankMap.values.toIndexedSeq
+  def find(id: EntityId): Option[Entity] = entityMap.get(id)
   
-  def findTank(id: TankId): Option[Tank] = tankMap.get(id)
-  
-  def tankNearestTo(tank: Tank): Option[Tank] = {
-    if (tankMap.size > 1)
-      Some((tankMap - tank.id).values.minBy(_ distanceTo tank))
-    else
-      None
+  def nearestTankTo(e: Entity): Option[Tank] = {
+    if (entityMap.size > 1) {
+      val otherTanks = (entityMap - e.id).values.collect { case Tank(t) => t }
+      Some(otherTanks.minBy(_ distanceTo e))
+    } else None
   }
-
-  def updateTank(tank: Tank) = new TankWorld(tankMap + (tank.id -> tank))
   
-  def updatePhysics: TankWorld = new TankWorld(tankMap mapValues (_.updatePhysics))
+  private def sanitizeId(e: Entity): Entity = 
+    if (e.id == EntityId.Auto) e.replaceId(EntityId(s"[AUTO-$nextId]"))
+    else e
   
-  def updateAI(interpreter: MoveInterpreter) = (this /: tanks)(interpreter)
+  def withEntity(e: Entity) = {
+    val e2 = sanitizeId(e)
+    new World(dimensions, entityMap + (e2.id -> e2), nextId + 1)
+  }
+   
+  def runPhysics: World = new World(dimensions, entityMap mapValues (_ run bounds.cropPt), nextId) 
+  
+  def runAI(interpreter: MoveInterpreter): World = (this /: entities)(interpreter)
+ 
 }
+
+
+case class TankGame(world: World, interpreter: MoveInterpreter, frame: Int) {
+  def runFrame = TankGame(world.runPhysics.runAI(interpreter), interpreter, frame + 1)
+}
+
