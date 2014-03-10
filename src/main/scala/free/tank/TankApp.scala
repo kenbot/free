@@ -17,21 +17,33 @@ import scala.util.Random
 object StartingState {
   import Moves._
   
-  def tankAI: AI[Unit] = for {
-    _ <-  rotateTank(Angle.degrees(10)) 
-    _ <- accelerate * 5
-    _ <- delay * 2
-    _ <- fire 
-    _ <- tankAI
-  } yield ()
-  
   val tanks = List(
-    Tank("1", Vec(100,100)) withAI tankAI)
+    Tank("1", Vec(100,100)) withAI loop(for {
+      t <- findNearestTank
+      _ <- aimAtTank(t)
+      _ <- fire
+      _ <- accelerate 
+    } yield ()),
     
-   // Tank("2", Vec(200, 200)), 
-   // Tank("3", Vec(300,300)))
+    Tank("2", Vec(200, 200)) withAI loop(for {
+      t <- findNearestTank
+      _ <- aimAwayFrom(t)
+      _ <- accelerate * 20
+    } yield ()),
+    
+    
+    Tank("3", Vec(300,300)) withAI loop(for {
+      _ <- moveTo(Vec(10,10))
+      _ <- fire
+      _ <- moveTo(Vec(300, 10))
+      _ <- fire
+      _ <- moveTo(Vec(300, 300))
+      _ <- fire
+      _ <- moveTo(Vec(10, 300))
+      _ <- fire
+    } yield ()))
       
-  val world = World(Dim(500,500), tanks)
+  val world = World(Dim(1000,700), tanks)
   val game = TankGame(world, EasyTankAI, 0)
 }
 
@@ -52,7 +64,6 @@ object TankApp extends SimpleSwingApplication {
   
   val gameTimer = new javax.swing.Timer(40, ActionListener {_ => 
     game = game.runFrame
-    val t1 = game.world.find(EntityId("1")).get
     top.repaint()
   })
   
@@ -65,8 +76,6 @@ object TankApp extends SimpleSwingApplication {
     gameTimer.stop()
     super.shutdown()
   }
-
-
 }
 
 trait PaintWorld extends Component {
@@ -77,13 +86,16 @@ trait PaintWorld extends Component {
   
   override def paintComponent(g: Graphics2D): Unit = {
     super.paintComponent(g)
-    g.setColor(Color.red)
-    
+    val scrW = size.width.toDouble
+    val scrH = size.height.toDouble
+    val worldW = world.bounds.width
+    val worldH = world.bounds.height
+    g.translate(scrW/2 - worldW/2, scrH/2 - worldH/2)
     paintWorld(g)
   }
   
   def paintWorld(g: Graphics2D): Unit = {
-    
+
     g.setColor(Color.white)
     g.fillRect(world.bounds.x1.toInt, world.bounds.y1.toInt, world.bounds.width.toInt, world.bounds.height.toInt)
     
@@ -98,24 +110,25 @@ trait PaintWorld extends Component {
     case m: Missile => paintMissile(g, m)
     case x => sys.error("Unexpected entity: " + x)
   }
-  
+
   
   def paintTank(g: Graphics2D, t: Tank): Unit = {
+    val (rectX, rectY, rectW, rectH) = t.bounds.toSizeIntTuple
+    
+    g.fillRect(rectX, rectY, rectW, rectH)
+    
     val (x1, y1) = t.pos.toIntTuple
-    g.drawRect(x1 - 5, y1 - 5, 10, 10)
-    val pt1 = t.pos
     val vec = Vec.fromAngle(t.facing, 20.0)
     
-    val pt2 = t.pos + vec
-    val (x2, y2) = pt2.toIntTuple
+    val (x2, y2) = (t.pos + vec).toIntTuple
     g.drawLine(x1, y1, x2, y2)
   }
   
   
   def paintMissile(g: Graphics2D, m: Missile): Unit = {
-    val (x,y) = m.pos.toIntTuple
+    val (x,y, width, height) = m.bounds.toSizeIntTuple
     g.setColor(Color.red)
-    g.fillOval(x-3, y-3, 6, 6)
+    g.fillOval(x, y, width, height)
   }
 }
 

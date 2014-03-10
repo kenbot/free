@@ -1,7 +1,7 @@
 package free.tank
 
-import scala.math._
 import scala.annotation.tailrec
+import scala.math._
 
 
 object Percentage {
@@ -36,6 +36,10 @@ object Angle {
   val ThreeQuarters = Angle(3*Pi/2)
   val Full = Angle(TwoPi)
   
+  implicit class DoubleOps(d: Double) {
+    def degrees = Angle.degrees(d)
+    def radians = Angle(d)
+  }
   
   def degrees(degs: Double) = Angle(degs * Pi / 180.0)
   
@@ -49,42 +53,71 @@ object Angle {
   def apply(radians: Double) = new Angle(normalize(radians))
 }
 
-class Angle(val radians: Double) extends AnyVal {
+class Angle(val radians: Double) extends AnyVal  {
   def sin: Double = math.sin(radians)
   def cos: Double = math.cos(radians)
   def tan: Double = math.tan(radians)
-  def opposite: Angle = (this + Angle.Half)
+  def opposite: Angle = Angle(radians + Pi)
   def degrees: Double = radians * 180.0 / Pi
-  def unary_- = Angle(radians + Pi)
+  def unary_- = Angle(-radians)
   def +(other: Angle) = Angle(radians + other.radians)
   def -(other: Angle) = Angle(radians - other.radians)
   def *(factor: Double) = Angle(radians * factor)
   def /(factor: Double) = Angle(radians / factor)
-    
+  
+  def addUpTo(add: Angle, upTo: Angle): Angle = {
+    val upToDist = upTo - this
+    if (upToDist.radians < add.radians) upTo else this + add
+  }
+  
   override def toString() = s"Angle($radians)"
 }
 
 case class Dim(width: Double, height: Double) {
+  def positionedAt(topLeft: Vec) = Rect(topLeft.x, topLeft.y, topLeft.x + width, topLeft.y + height)
+  def centeredAt(centre: Vec) = {
+    val halfW = width/2
+    val halfH = height/2
+    Rect(centre.x - halfW, centre.y - halfH, centre.x + halfW, centre.y + halfH)
+  }
+  
   def toTuple = (width, height)
+  def toIntTuple = (width.round.toInt, height.round.toInt)
 }
 
 case class Rect(x1: Double, y1: Double, x2: Double, y2: Double) {
   def width = x2 - x1
   def height = y2 - y1
   def bounds = Dim(width, height)
+  def size = Dim(width, height)
   
   def topLeft = Vec(x1, y1)
   def topRight = Vec(x2, y1)
   def bottomRight = Vec(x2, y2)
   def bottomLeft = Vec(x1, y2)
   def center = Vec(x1 + width/2, y1 + height/2)
+  def corners = List(topLeft, topRight, bottomRight, bottomLeft)
+  
+  def toTuple = (x1, y1, x2, y2)
+  def toIntTuple = (x1.round.toInt, y1.round.toInt, x2.round.toInt, y2.round.toInt)
+  def toSizeTuple = (x1, y1, width, height)
+  def toSizeIntTuple = (x1.round.toInt, y1.round.toInt, width.round.toInt, height.round.toInt)
   
   def containsX(x: Double) = x >= x1 && x < x2
   def containsY(y: Double) = y >= y1 && y < y2
   def containsPt(pt: Vec) = containsX(pt.x) && containsY(pt.y)
   def containsRect(rect: Rect) = (containsX(rect.x1) && containsX(rect.x2) 
                                && containsY(rect.y1) && containsY(rect.y2))
-                          
+            
+  def intersects(other: Rect): Boolean = {
+    val (tx, ty, th, tw) = toIntTuple
+    val (rx, ry, rh, rw) = other.toIntTuple
+    (rw < rx || rw > tx) &&
+    (rh < ry || rh > ty) &&
+    (tw < tx || tw > rx) &&
+    (th < ty || th > ry)
+  }                             
+                               
   def cropX(x: Double) = if (x >= x2) x2-1
                          else if (x < x1) x1
                          else x
@@ -95,8 +128,12 @@ case class Rect(x1: Double, y1: Double, x2: Double, y2: Double) {
                          
   def cropPt(pt: Vec) = Vec(cropX(pt.x), cropY(pt.y))
   
-  def wrapX(x: Double) = x % width + x1
-  def wrapY(y: Double) = y % height + y1
+  private def wrap(c: Double, lim: Double, c1: Double): Double = 
+    if (c < 0) wrap(c + lim, lim, c1)
+    else if (c > lim) wrap(c - lim, lim, c1)
+    else c % lim + c1
+  def wrapX(x: Double) = wrap(x, width, x1)
+  def wrapY(y: Double) = wrap(y, height, y1)
   def wrapPt(pt: Vec) = Vec(wrapX(pt.x), wrapY(pt.y))
   
   def centreInRect(outerRect: Rect): Rect = {
@@ -133,7 +170,7 @@ case class Vec(x: Double, y: Double) {
   def /(factor: Double): Vec = this * (1.0 / factor)           
   def toTuple: (Double, Double) = (x,y)
   def toIntTuple: (Int, Int) = (x.round.toInt, y.round.toInt)
-  def between(vec: Vec) = this - vec
+  def between(vec: Vec) = vec - this
   def distanceTo(pt: Vec) = between(pt).length
   def angleTo(pt: Vec) = between(pt).angle
 }
