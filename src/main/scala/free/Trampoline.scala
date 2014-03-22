@@ -41,13 +41,13 @@ object Trampoline extends EvenProgram {
 
 
 trait EvenProgram {
-  val bigRange = (1 to 10).toStream
+  val bigRange = (1 to 10000).toStream
 
   def runTest(range: Stream[Int]): Boolean
   
   def main(args: Array[String]): Unit = {
     val isEven = runTest(bigRange)
-    println(s"Even: evenTest")
+    println(s"Even: $isEven")
   }
 }
 
