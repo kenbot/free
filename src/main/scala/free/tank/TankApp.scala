@@ -21,8 +21,9 @@ object StartingState {
     Tank("1", Vec(100,100)) withAI loop(for {
       t <- findNearestTank
       _ <- aimAtTank(t)
-      _ <- fire
-      _ <- accelerate 
+      _ <- fire * 3
+      _ <- accelerate * 10
+      _ <- delay * 30
     } yield ()),
     
     Tank("2", Vec(200, 200)) withAI loop(for {

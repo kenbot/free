@@ -196,8 +196,11 @@ class World private (dimensions: Dim, entityMap: SortedMap[EntityId, Entity], ne
   }
   
   private def runPhysics: World = new World(dimensions, entityMap mapValues (_ run bounds.containsPt), nextId)
+  
   private def removeDead: World = new World(dimensions, removeEntitiesIf(_.dead), nextId)
+  
   private def runAI(interpreter: MoveInterpreter): World = (this /: entities)(interpreter)
+  
   private def removeEntitiesIf(p: Entity => Boolean) = entityMap.filterNot(kv => p(kv._2))
 }
 

@@ -72,8 +72,10 @@ trait BasicMoves {
 trait AdvancedMoves extends BasicMoves {
   
   implicit class AIOps(ai: AI[Unit]) {
-    def *(times: Int): AI[Unit] = 
+    def *(times: Int): AI[Unit] = {
+      require(times >= 1)
       if (times == 1) ai else ai >> this * (times - 1)
+    }
   }
   
   def loop(ai: AI[Unit]): AI[Unit] = ai >> loop(ai)
@@ -96,7 +98,7 @@ trait AdvancedMoves extends BasicMoves {
   
   def rotateTowards(angle: Angle): AI[Unit] = for {
     ok <- isFacing(angle)
-    _ <- ok.unlessM(rotateLeftUpTo(angle) >> rotateTowards(angle))
+    _ <- unless(ok)(rotateLeftUpTo(angle) >> rotateTowards(angle))
   } yield ()
   
   def moveTo(pos: Vec): AI[Unit] = for {
@@ -125,13 +127,23 @@ trait MoveInterpreter extends ((World, Entity) => World) {
   protected def interpretMove(world: World, entity: Entity, move: Move[AI[Unit]]): World
 
   
-  protected def updateAI(world: World, e: Entity, nextAI: AI[Unit]): World = {
+  protected def updateAI(world: World, e: Entity, nextAI: AI[Unit]): World = 
     world withEntity (e withAI nextAI)
-  }
 }
 
 
-object EasyTankAI extends MoveInterpreter {
+object HardTankAI extends DefaultTankAI 
+
+object EasyTankAI extends DefaultTankAI {
+  import Moves._
+  
+  override def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
+    case Fire(_) => super.interpretMove(world, e, move)
+    case _ => super.interpretMove(world, e, move)
+  }
+}
+
+trait DefaultTankAI extends MoveInterpreter {
   def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
     
     case Accelerate(next) => 
