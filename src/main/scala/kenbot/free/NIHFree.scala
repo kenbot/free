@@ -1,10 +1,11 @@
-package free.nih
+package kenbot.free
 
 import scalaz._
 import Scalaz._
 import NIHFree._
 
 // NIH reimplementation of Free.  This was a helpful exercise to boost my understanding of the structure.
+// It may be helpful as a more minimal illustration of the mechanism than scalaz.Free.
 
 object NIHFree {
   implicit def monad[F[+_]](implicit F: Functor[F]): Monad[({type f[x] = NIHFree[F,x]})#f] = new Monad[({type f[x] = NIHFree[F,x]})#f] {

@@ -1,9 +1,13 @@
-package free
+package kenbot.free
 
 import scalaz._
 import Scalaz._
 import Free._
 import scala.collection.mutable
+
+// This example is based off the one in Runar Bjarnason's "Dead Simple Dependency Injection" talk.
+// http://www.youtube.com/watch?v=ZasXwtTRkio
+
 
 // 0. Fantasy API
 // def put(key: String, value: String): Unit

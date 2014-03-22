@@ -1,4 +1,4 @@
-package free.trampoline
+package kenbot.free
 
 import scalaz._
 import Scalaz._

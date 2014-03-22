@@ -1,5 +1,7 @@
 .cache
 .classpath
 .project
+.settings/
+.worksheet/
 project/target/
 target/

@@ -1,11 +1,15 @@
-package free.tank
+package kenbot.free.tank.ai
 
 import Moves._
 import scalaz._
 import scalaz.Free._
 import scalaz.Scalaz._
+import kenbot.free.tank.model.Tank
+import kenbot.free.tank.maths.Vec
+import kenbot.free.tank.maths.Angle
+import kenbot.free.tank.model.Entity
 
-
+// ADT for tank moves
 sealed trait Move[+A]
 case class Accelerate[A](next: A) extends Move[A] 
 case class RotateLeft[A](upTo: Option[Angle], next: A) extends Move[A]
@@ -16,8 +20,10 @@ case class FindNearestTank[A](onFoundTank: Tank => A) extends Move[A]
 case class AngleTo[A](toPos: Vec, onAngle: Angle => A) extends Move[A]
 case class IsAt[A](pos: Vec, onAt: Boolean => A) extends Move[A]
 case class IsFacing[A](angle: Angle, onFacing: Boolean => A) extends Move[A]
+case class Me[A](onMe: Entity => A) extends Move[A]
   
 
+// Functor definition
 object Move {
   implicit def functor: Functor[Move] =  new Functor[Move] {
     def map[A,B](move: Move[A])(f: A => B): Move[B] = move match {
@@ -30,19 +36,20 @@ object Move {
       case AngleTo(toPos, onAngle) => AngleTo(toPos, onAngle andThen f)
       case IsAt(pos, onAt) => IsAt(pos, onAt andThen f)
       case IsFacing(angle, onFacing) => IsFacing(angle, onFacing andThen f)
+      case Me(onMe) => Me(onMe andThen f)
     }
   }
 }
 
 object Moves extends AdvancedMoves
 
-
+// Lifting functions.  Note that liftF is implicit within the trait.
 trait BasicMoves {
   type AI[A] = Free[Move, A]
   
   val AIDone: AI[Unit] = Return(())
   
-  protected implicit def liftMove[A](move: Move[A]): AI[A] = liftF(move)
+  private implicit def liftMove[A](move: Move[A]): AI[A] = liftF(move)
   
   def accelerate: AI[Unit] = Accelerate(())
 
@@ -66,9 +73,11 @@ trait BasicMoves {
   
   def isFacing(angle: Angle): AI[Boolean] = IsFacing(angle, identity)
   
+  def me: AI[Entity] = Me(identity)
+  
 }
 
-
+// Fancy composite tank moves
 trait AdvancedMoves extends BasicMoves {
   
   implicit class AIOps(ai: AI[Unit]) {
@@ -101,6 +110,8 @@ trait AdvancedMoves extends BasicMoves {
     _ <- unless(ok)(rotateLeftUpTo(angle) >> rotateTowards(angle))
   } yield ()
   
+  def distanceTo(e: Entity): AI[Double] = me.map(_ distanceTo e)
+  
   def moveTo(pos: Vec): AI[Unit] = for {
     arrived <- isAt(pos)
     _ <- unless(arrived)(for {
@@ -118,71 +129,5 @@ trait AdvancedMoves extends BasicMoves {
   } yield ()
 }
 
-trait MoveInterpreter extends ((World, Entity) => World) {
-  
-  final def apply(world: World, entity: Entity): World = {
-    entity.ai.resume.fold(interpretMove(world, entity, _), _ => world)
-  }
-  
-  protected def interpretMove(world: World, entity: Entity, move: Move[AI[Unit]]): World
-
-  
-  protected def updateAI(world: World, e: Entity, nextAI: AI[Unit]): World = 
-    world withEntity (e withAI nextAI)
-}
-
-
-object HardTankAI extends DefaultTankAI 
-
-object EasyTankAI extends DefaultTankAI {
-  import Moves._
-  
-  override def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
-    case Fire(_) => super.interpretMove(world, e, move)
-    case _ => super.interpretMove(world, e, move)
-  }
-}
-
-trait DefaultTankAI extends MoveInterpreter {
-  def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
-    
-    case Accelerate(next) => 
-      updateAI(world, e accelerateForward Tank.Acceleration, next)
-      
-    case RotateLeft(upTo, next) => 
-      val rotatedEntity: Entity = (upTo.fold
-          (e rotateBy Tank.RotationRate)
-          (e.rotateUpTo(Tank.RotationRate, _)))
-      updateAI(world, rotatedEntity, next)
-   
-    case RotateRight(upTo, next) => 
-      val rotatedEntity: Entity = (upTo.fold
-          (e rotateBy -Tank.RotationRate)
-          (e.rotateUpTo(-Tank.RotationRate, _)))
-      updateAI(world, rotatedEntity, next)
-      
-    case Delay(next) => 
-      updateAI(world, e, next)
-    
-    case Fire(next) => 
-      val maybeMissile = Tank.unapply(e).map(_.fire)
-      val updatedWorld = maybeMissile.fold(world)(world.withEntity)
-      updateAI(updatedWorld, e, next)
-      
-    case FindNearestTank(onFoundTank) => 
-      val maybeNearest = world nearestTankTo e
-      val nextAI = maybeNearest.fold(e.ai)(onFoundTank)
-      updateAI(world, e, nextAI)
-      
-    case AngleTo(toPos, onAngle) => 
-      updateAI(world, e, onAngle(e.pos angleTo toPos))
-      
-    case IsAt(pos, onAt) => 
-      updateAI(world, e, onAt(e.pos.distanceTo(pos) <= 4))
-    
-    case IsFacing(angle, onFacing) => 
-      updateAI(world, e, onFacing((e.facing - angle).radians <= 0.01))
-  }
-}
   
 
