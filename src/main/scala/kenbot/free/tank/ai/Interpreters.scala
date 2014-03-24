@@ -5,6 +5,7 @@ import kenbot.free.tank.model.Tank
 import kenbot.free.tank.model.World
 import kenbot.free.tank.model.Entity
 import kenbot.free.tank.maths.Angle
+import scala.util.Random
 
 trait MoveInterpreter extends ((World, Entity) => World) {
   
@@ -27,10 +28,12 @@ object EasyTankAI extends DefaultTankAI {
   import Angle._
   
   override def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
-    //case Fire(next) => updateAI(world, e, next)
+    case Fire(next) => 
+      if (Random.nextBoolean) updateAI(world, e, next) // Don't fire
+      else super.interpretMove(world, e, move) // Do fire
     
     case AngleTo(toPos, onAngle) => 
-      updateAI(world, e, onAngle((e.pos angleTo toPos) + 10.degrees))
+      updateAI(world, e, onAngle((e.pos angleTo toPos) + (Random.nextInt(40) - 20).degrees))
       
     case _ => super.interpretMove(world, e, move)
   }
