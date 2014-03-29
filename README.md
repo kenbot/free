@@ -1,7 +1,7 @@
 Free Monad examples
 ===============
 
-Presented to the Melbourne Scala User Group on March 24th 2014.
+Presented to the Melbourne Scala User Group on March 24th 2014, of which you can [find the slides on SlideShare](http://www.slideshare.net/kenbot/running-free-with-the-monads).
 
 Tank Game
 ---------------
