@@ -32,7 +32,7 @@ object Trampoline extends EvenProgram {
   
   def even[A](list: Stream[A]): Trampoline[Boolean] = list match {
     case a #:: as => Suspend(() => odd(as))
-    case Stream.Empty => Return(false)
+    case Stream.Empty => Return(true)
   }
 
   def runTest(range: Stream[Int]) = even(range).run
