@@ -12,7 +12,7 @@ object Tank {
   val GunRange = 10000.0
   val MissileSpeed = 10.0
   val MaxSpeed = 50
-  val RotationRate = Angle.degrees(10)
+  val RotationRate = Angle.degrees(5)
   val Size = Dim(10,10)
   
   def apply(id: String, pos: Vec): Tank = {
@@ -38,7 +38,7 @@ case class Tank(id: EntityId, ai: AI[Unit], physics: Physics, gunAngle: Angle, a
   
   def kill = copy(alive = false, ai = AIDone)
   
-  def fire = Missile.fireToward(pos, facing, Tank.MissileSpeed, Tank.GunRange)
+  def fire = Missile.fireToward(pos + Vec.fromAngle(facing, 20.0), facing, Tank.MissileSpeed, Tank.GunRange)
   
   def updatePhysics(f: Physics => Physics): Tank = copy(physics = f(physics))
 }

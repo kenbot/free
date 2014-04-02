@@ -107,7 +107,13 @@ trait AdvancedMoves extends BasicMoves {
   
   def rotateTowards(angle: Angle): AI[Unit] = for {
     ok <- isFacing(angle)
-    _ <- unless(ok)(rotateLeftUpTo(angle) >> rotateTowards(angle))
+    tank <- me
+    _ <- unless(ok) {
+           val left = tank.facing isLeftOf angle
+           val rotationAction = if (left) rotateLeftUpTo(angle)
+                                else rotateRightUpTo(angle)
+           rotationAction >> rotateTowards(angle)
+         }
   } yield ()
   
   def distanceTo(e: Entity): AI[Double] = me.map(_ distanceTo e)

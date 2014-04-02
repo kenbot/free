@@ -6,6 +6,7 @@ import kenbot.free.tank.ai.EasyTankAI
 import kenbot.free.tank.maths.Vec
 import kenbot.free.tank.maths.Dim
 import kenbot.free.tank.ai.Moves
+import kenbot.free.tank.ai.HardTankAI
 
 object StartingState {
   import Moves._
@@ -15,8 +16,7 @@ object StartingState {
       t <- findNearestTank
       _ <- aimAtTank(t)
       _ <- fire * 3
-      _ <- accelerate * 10
-      _ <- delay * 30
+      _ <- accelerate * 4
     } yield ()),
     
     Tank("2", Vec(200, 200)) withAI loop(for {

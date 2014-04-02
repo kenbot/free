@@ -5,7 +5,7 @@ import kenbot.free.tank.maths.Vec
 import kenbot.free.tank.maths.Angle
 
 object EntityId {
-  def Auto = EntityId("[AUTO]")
+  val Auto = EntityId("[AUTO]")
 }
 
 case class EntityId(name: String) extends AnyVal with Ordered[EntityId] {

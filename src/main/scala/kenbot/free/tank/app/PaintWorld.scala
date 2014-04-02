@@ -8,6 +8,7 @@ import kenbot.free.tank.maths.Vec
 import kenbot.free.tank.model.Missile
 import kenbot.free.tank.model.World
 import kenbot.free.tank.model.Entity
+import kenbot.free.tank.maths.Rect
 
 
 trait PaintWorld extends Component {
@@ -29,12 +30,22 @@ trait PaintWorld extends Component {
   def paintWorld(g: Graphics2D): Unit = {
 
     g.setColor(Color.white)
-    g.fillRect(world.bounds.x1.toInt, world.bounds.y1.toInt, world.bounds.width.toInt, world.bounds.height.toInt)
+    fillRect(g, world.bounds)
     
     g.setColor(Color.black)
-    g.drawRect(world.bounds.x1.toInt, world.bounds.y1.toInt, world.bounds.width.toInt, world.bounds.height.toInt)
-    
+    paintRect(g, world.bounds)
+
     world.entities foreach paintEntity(g)
+  }
+  
+  def paintRect(g: Graphics2D, r: Rect) {
+    val (x, y, w, h) = r.toSizeIntTuple
+    g.drawRect(x, y, w, h)
+  }
+  
+  def fillRect(g: Graphics2D, r: Rect) {
+    val (x, y, w, h) = r.toSizeIntTuple
+    g.fillRect(x, y, w, h)
   }
   
   def paintEntity(g: Graphics2D)(e: Entity): Unit = e match {
@@ -45,9 +56,9 @@ trait PaintWorld extends Component {
 
   
   def paintTank(g: Graphics2D, t: Tank): Unit = {
-    val (rectX, rectY, rectW, rectH) = t.bounds.toSizeIntTuple
+    g.setColor(if (t.dead) Color.gray else Color.black)
     
-    g.fillRect(rectX, rectY, rectW, rectH)
+    fillRect(g, t.bounds)
     
     val (x1, y1) = t.pos.toIntTuple
     val vec = Vec.fromAngle(t.facing, 20.0)

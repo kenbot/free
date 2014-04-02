@@ -26,9 +26,9 @@ object TankApp extends SimpleSwingApplication {
       val buttonPanel = new FlowPanel {
         val easyButton = new Button("Easy")
         val hardButton = new Button("Hard")
-        contents += (easyButton, hardButton)
+        contents += (hardButton, easyButton)
         
-        val buttonGroup = new ButtonGroup(easyButton, hardButton)
+        val buttonGroup = new ButtonGroup(hardButton, easyButton)
         
         listenTo(easyButton)
         listenTo(hardButton)

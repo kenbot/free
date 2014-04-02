@@ -27,14 +27,16 @@ class World private (dimensions: Dim, entityMap: SortedMap[EntityId, Entity], ne
   def find(id: EntityId): Option[Entity] = entityMap.get(id)
   
   def nearestTankTo(e: Entity): Option[Tank] = {
-    if (entityMap.size > 1) {
-      val otherTanks = (entityMap - e.id).values.collect { case Tank(t) => t }
+    val otherTanks = (entityMap - e.id).values.collect { case Tank(t) if t.alive => t }
+    if (otherTanks.nonEmpty)
       Some(otherTanks.minBy(_ distanceTo e))
-    } else None
+    else 
+      None 
   }
   
   
-  def collidingEntities(rect: Rect): Seq[Entity] = entities.filter(_.bounds intersects rect)
+  def collidingEntities(rect: Rect): Seq[Entity] = 
+    entities.filter(_.bounds intersects rect)
 
   
   private def sanitizeId(e: Entity): Entity = 
@@ -47,13 +49,15 @@ class World private (dimensions: Dim, entityMap: SortedMap[EntityId, Entity], ne
   }
    
   def runFrame(interpreter: MoveInterpreter): World = 
-    removeDead.runPhysics.runAI(interpreter)
+    runPhysics.killCollidingEntities.runAI(interpreter)
     
   private def killCollidingEntities: World = {
     val newlyKilled = for {
       e <- entities 
       x <- collidingEntities(e.bounds) if !e.sameAs(x)
     } yield x.id -> x.kill
+    
+    
     
     new World(dimensions, entityMap ++ newlyKilled, nextId)
   }

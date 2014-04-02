@@ -43,6 +43,9 @@ class Angle(val radians: Double) extends AnyVal  {
   def *(factor: Double) = Angle(radians * factor)
   def /(factor: Double) = Angle(radians / factor)
   
+  def isLeftOf(a: Angle): Boolean =  (a.radians + 3 * Pi) - radians + Angle.TwoPi < Pi
+  def isRightOf(a: Angle): Boolean = !isLeftOf(a)
+  
   def addUpTo(add: Angle, upTo: Angle): Angle = {
     val upToDist = upTo - this
     if (upToDist.radians < add.radians) upTo else this + add
