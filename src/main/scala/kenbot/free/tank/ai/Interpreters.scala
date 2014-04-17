@@ -10,7 +10,9 @@ import scala.util.Random
 trait MoveInterpreter extends ((World, Entity) => World) {
   
   final def apply(world: World, entity: Entity): World = {
-    entity.ai.resume.fold(interpretMove(world, entity, _), _ => world)
+    entity.ai.resume.fold(
+        interpretMove(world, entity, _), 
+        _ => world)
   }
   
   protected def interpretMove(world: World, entity: Entity, move: Move[AI[Unit]]): World

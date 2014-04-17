@@ -12,7 +12,7 @@ import Scalaz._
 
 
 class RectTest extends PropSpec with GeneratorDrivenPropertyChecks with Matchers {
-  val genDouble = Gen.chooseNum(-999999, 999999)
+  val genDouble = Gen.chooseNum(-999999.0, 999999.0, -1.0, 0.0, 1.0)
   
   implicit val genRect: Gen[Rect] = for {
     x1 <- genDouble

@@ -21,7 +21,8 @@ object World {
 
 class World private (dimensions: Dim, entityMap: SortedMap[EntityId, Entity], nextId: Int) {
   lazy val entities: Seq[Entity] = entityMap.values.toIndexedSeq
-   
+  private lazy val entityIds = entityMap.keys
+  
   val bounds = Rect(0.0, 0.0, dimensions.width, dimensions.height)
   
   def find(id: EntityId): Option[Entity] = entityMap.get(id)

@@ -1,10 +1,11 @@
 package kenbot.free.tank.maths
 
-import scala.math.Pi
 import scala.annotation.tailrec
+import scala.math.floor
 
 object Angle {
   
+  val Pi = math.Pi
   val TwoPi = 2 * Pi
   val PiOver2 = Pi / 2
   
@@ -21,17 +22,20 @@ object Angle {
   
   def degrees(degs: Double) = Angle(degs * Pi / 180.0)
   
-  @tailrec 
   def normalize(radians: Double): Double = {
-    if (radians < 0) normalize(radians + TwoPi)
-    else if (radians >= TwoPi) normalize(radians - TwoPi)
-    else radians
+    val fullCycles = (radians / TwoPi).asInstanceOf[Int]
+    val possiblyNegative = radians - TwoPi * fullCycles
+    
+    if (possiblyNegative < 0) possiblyNegative + TwoPi 
+    else possiblyNegative
   }
   
   def apply(radians: Double) = new Angle(normalize(radians))
 }
 
-class Angle(val radians: Double) extends AnyVal  {
+class Angle private (val radians: Double) extends AnyVal with Ordered[Angle] {
+  import Angle.{Pi, Zero, Half}
+  
   def sin: Double = math.sin(radians)
   def cos: Double = math.cos(radians)
   def tan: Double = math.tan(radians)
@@ -42,13 +46,29 @@ class Angle(val radians: Double) extends AnyVal  {
   def -(other: Angle) = Angle(radians - other.radians)
   def *(factor: Double) = Angle(radians * factor)
   def /(factor: Double) = Angle(radians / factor)
+  def compare(a: Angle): Int = {
+    if (this == a) 0 
+    else if (this.radians < a.radians) -1
+    else +1
+  }
   
-  def isLeftOf(a: Angle): Boolean =  (a.radians + 3 * Pi) - radians + Angle.TwoPi < Pi
-  def isRightOf(a: Angle): Boolean = !isLeftOf(a)
+  private def shiftSin(x: Double) = math.sin(x - radians - Pi)
+  
+  def isLeftOf(a: Angle): Boolean = 
+    (a == opposite) || (a != this && shiftSin(a.radians) < 0)
+  
+  def isRightOf(a: Angle): Boolean = 
+    (a == opposite) || (a != this && shiftSin(a.radians) > 0)
+  
+  def distanceTo(a: Angle): Angle = {
+    val diff = a - this
+    if (diff < Angle.Half) diff else -diff
+  }
   
   def addUpTo(add: Angle, upTo: Angle): Angle = {
-    val upToDist = upTo - this
-    if (upToDist.radians < add.radians) upTo else this + add
+    val added = this + add
+    if (isLeftOf(upTo) != added.isLeftOf(upTo)) upTo else added
+    //if (distanceTo(upTo) < added.distanceTo(upTo)) upTo else added
   }
   
   override def toString() = s"Angle($radians)"
