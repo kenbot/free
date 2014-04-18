@@ -12,6 +12,7 @@ import scala.swing.ButtonGroup
 import scala.swing.event.ButtonClicked
 import kenbot.free.tank.ai.{EasyTankAI, HardTankAI}
 import scala.swing.RadioButton
+import kenbot.free.tank.ai.TruceTankAI
 
 
 object TankApp extends SimpleSwingApplication {
@@ -25,18 +26,22 @@ object TankApp extends SimpleSwingApplication {
       }
       
       val buttonPanel = new FlowPanel {
-        val easyButton = new RadioButton("Easy") { selected = true }
+        val truceButton = new RadioButton("Truce") { selected = true }
+        val easyButton = new RadioButton("Easy")
         val hardButton = new RadioButton("Hard") 
         val restartButton = new Button("Restart")
-        contents += (easyButton, hardButton, restartButton)
+        contents += (truceButton, easyButton, hardButton, restartButton)
         
-        val buttonGroup = new ButtonGroup(hardButton, easyButton)
-        listenTo(easyButton, hardButton, restartButton)
+        val buttonGroup = new ButtonGroup(truceButton, easyButton, hardButton)
+        listenTo(truceButton, easyButton, hardButton, restartButton)
         
         reactions += {
+          case ButtonClicked(`truceButton`) => game = game withInterpreter TruceTankAI
           case ButtonClicked(`easyButton`) => game = game withInterpreter EasyTankAI
           case ButtonClicked(`hardButton`) => game = game withInterpreter HardTankAI
-          case ButtonClicked(`restartButton`) => game = StartingState.game
+          case ButtonClicked(`restartButton`) =>
+            game = StartingState.game
+            truceButton.selected = true
         }
       }
       

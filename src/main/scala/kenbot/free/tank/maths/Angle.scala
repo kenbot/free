@@ -68,7 +68,6 @@ class Angle private (val radians: Double) extends AnyVal with Ordered[Angle] {
   def addUpTo(add: Angle, upTo: Angle): Angle = {
     val added = this + add
     if (isLeftOf(upTo) != added.isLeftOf(upTo)) upTo else added
-    //if (distanceTo(upTo) < added.distanceTo(upTo)) upTo else added
   }
   
   override def toString() = s"Angle($radians)"

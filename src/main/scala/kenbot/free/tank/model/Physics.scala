@@ -20,10 +20,10 @@ case class Physics(facing: Angle, pos: Vec, vel: Vec, acc: Vec, size: Dim, frict
   
   def accelerate(acc: Vec): Physics = copy(acc = this.acc + acc)
   
-  def rotateBy(a: Angle): Physics = copy(facing = facing + a)
   def rotateTo(a: Angle): Physics = copy(facing = a)
-  def rotateUpTo(by: Angle, upTo: Angle): Physics = copy(facing = facing.addUpTo(by, upTo))
-  
+  def rotateBy(by: Angle, upTo: Option[Angle] = None): Physics = 
+    copy(facing = upTo.fold(facing + by)(facing.addUpTo(by, _)))
+    
   private def frictionMult = friction.complement
   
   private def constrainPos(allowMove: Vec => Boolean, newPos: Vec): Vec = if (allowMove(newPos)) newPos else pos

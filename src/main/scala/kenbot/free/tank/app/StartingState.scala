@@ -7,6 +7,7 @@ import kenbot.free.tank.maths.Vec
 import kenbot.free.tank.maths.Dim
 import kenbot.free.tank.ai.Moves
 import kenbot.free.tank.ai.HardTankAI
+import kenbot.free.tank.ai.TruceTankAI
 
 object StartingState {
   import Moves._
@@ -44,6 +45,6 @@ object StartingState {
     } yield ()))
       
   val world = World(Dim(1000,700), tanks)
-  val game = TankGame(world, EasyTankAI, 0)
+  val game = TankGame(world, TruceTankAI, 0)
 }
 

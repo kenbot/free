@@ -54,9 +54,8 @@ trait Physical {
   
   final def accelerateForward(acc: Double): This = updatePhysics(_ accelerateForward acc)
   final def distanceTo(other: Physical) = pos distanceTo other.pos
-  final def rotateBy(a: Angle): This = updatePhysics(_ rotateBy a)
+  final def rotateBy(a: Angle, upTo: Option[Angle] = None): This = updatePhysics(_.rotateBy(a, upTo))
   final def rotateTo(a: Angle): This = updatePhysics(_ rotateTo a)
-  final def rotateUpTo(by: Angle, upTo: Angle) = updatePhysics(_.rotateUpTo(by, upTo))
 }
 
 

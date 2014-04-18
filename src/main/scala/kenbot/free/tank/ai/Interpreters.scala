@@ -6,83 +6,116 @@ import kenbot.free.tank.model.World
 import kenbot.free.tank.model.Entity
 import kenbot.free.tank.maths.Angle
 import scala.util.Random
+import kenbot.free.tank.model.EntityId
 
 trait MoveInterpreter extends ((World, Entity) => World) {
   
+  type WorldChange = (World, EntityId) => World
+  
   final def apply(world: World, entity: Entity): World = {
     entity.ai.resume.fold(
-        interpretMove(world, entity, _), 
+        interpretMove(_)(world, entity.id), 
         _ => world)
   }
   
-  protected def interpretMove(world: World, entity: Entity, move: Move[AI[Unit]]): World
-
+  protected def interpretMove(move: Move[AI[Unit]]): WorldChange
   
-  protected def updateAI(world: World, e: Entity, nextAI: AI[Unit]): World = 
-    world withEntity (e withAI nextAI)
+  protected final def doNothing(nextAI: AI[Unit]): WorldChange = {
+    (world, id) => world.updateEntity(id)(_ withAI nextAI)
+  }
+  
+  protected final def updateEntity(nextAI: AI[Unit])(f: Entity => Entity): WorldChange = {
+    (world, id) => world.updateEntity(id)(e => f(e) withAI nextAI)
+  }
+  
+  protected final def updateWorld(nextAI: AI[Unit])(f: World => World): WorldChange = {
+    (world, id) => f(world).updateEntity(id)(_ withAI nextAI)
+  }
+  
+  protected final def updateEntityInWorld(nextAI: AI[Unit])(f: (World, Entity) => World): WorldChange = {
+    (world, id) => world.find(id).fold(world) { e => 
+      f(world, e).withEntity(e withAI nextAI)
+    }
+  }
+  
+  protected final def observeEntity[A](nextAI: A => AI[Unit])(f: Entity => A): WorldChange = {
+    (world, id) => world.updateEntity(id)(e => e withAI nextAI(f(e)))
+  }
+  
+  protected final def observeWorld[A](nextAI: A => AI[Unit])(f: World => A): WorldChange = {
+    (world, id) => world.updateEntity(id)(e => e withAI nextAI(f(world)))
+  }
+  
+  protected final def observeEntityInWorld[A](nextAI: (A => AI[Unit]))(f: (World, Entity) => A): WorldChange = {
+    (world, id) => world.updateEntity(id)(e => e withAI nextAI(f(world, e)))
+  }
 }
 
 
 object HardTankAI extends DefaultTankAI 
 
 object EasyTankAI extends DefaultTankAI {
-  import Moves._
   import Angle._
   
-  override def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
+  override def interpretMove(move: Move[AI[Unit]]): WorldChange = move match {
     case Fire(next) => 
-      if (Random.nextBoolean) updateAI(world, e, next) // Don't fire
-      else super.interpretMove(world, e, move) // Do fire
+      if (Random.nextBoolean) doNothing(next)
+      else super.interpretMove(move)
     
     case AngleTo(toPos, onAngle) => 
-      updateAI(world, e, onAngle((e.pos angleTo toPos) + (Random.nextInt(40) - 20).degrees))
+      observeEntity(onAngle)(_.pos.angleTo(toPos) + (Random.nextInt(40) - 20).degrees)
       
-    case _ => super.interpretMove(world, e, move)
+    case _ => super.interpretMove(move)
+  }
+}
+
+object TruceTankAI extends DefaultTankAI {
+  override def interpretMove(move: Move[AI[Unit]]): WorldChange = move match {
+    case Fire(next) => doNothing(next)
+    case _ => super.interpretMove(move)
   }
 }
 
 trait DefaultTankAI extends MoveInterpreter {
-  def interpretMove(world: World, e: Entity, move: Move[AI[Unit]]): World = move match {
+  def interpretMove(move: Move[AI[Unit]]): WorldChange = move match {
     
     case Accelerate(next) => 
-      updateAI(world, e accelerateForward Tank.Acceleration, next)
+      updateEntity(next)(_ accelerateForward Tank.Acceleration)
       
     case RotateLeft(upTo, next) => 
-      val rotatedEntity: Entity = (upTo.fold
-          (e rotateBy Tank.RotationRate)
-          (e.rotateUpTo(Tank.RotationRate, _)))
-      updateAI(world, rotatedEntity, next)
+      updateEntity(next)(_.rotateBy(Tank.RotationRate, upTo))
    
     case RotateRight(upTo, next) => 
-      val rotatedEntity: Entity = (upTo.fold
-          (e rotateBy -Tank.RotationRate)
-          (e.rotateUpTo(-Tank.RotationRate, _)))
-      updateAI(world, rotatedEntity, next)
+      updateEntity(next)(_.rotateBy(-Tank.RotationRate, upTo))
       
     case Delay(next) => 
-      updateAI(world, e, next)
+      doNothing(next)
     
     case Fire(next) => 
-      val maybeMissile = Tank.unapply(e).map(_.fire)
-      val updatedWorld = maybeMissile.fold(world)(world.withEntity)
-      updateAI(updatedWorld, e, next)
+      updateEntityInWorld(next) { (world, e) => 
+        val maybeMissile = Tank.unapply(e).map(_.fire)
+        maybeMissile.fold(world)(world.withEntity)
+      }
       
     case FindNearestTank(onFoundTank) => 
-      val maybeNearest = world nearestTankTo e
-      val nextAI = maybeNearest.fold(e.ai)(onFoundTank)
-      updateAI(world, e, nextAI)
+      def onMaybeFoundTank(t: Option[Tank]): AI[Unit] = 
+        t.fold(AIDone)(onFoundTank)
+        
+      observeEntityInWorld(onMaybeFoundTank) { (world, e) => 
+        world nearestTankTo e 
+      }
       
     case AngleTo(toPos, onAngle) => 
-      updateAI(world, e, onAngle(e.pos angleTo toPos))
+      observeEntity(onAngle)(_.pos angleTo toPos)
       
     case IsAt(pos, onAt) => 
-      updateAI(world, e, onAt(e.pos.distanceTo(pos) <= 4))
+      observeEntity(onAt)(_.pos.distanceTo(pos) <= 4)
     
     case IsFacing(angle, onFacing) => 
-      updateAI(world, e, onFacing((e.facing - angle).radians <= 0.01))
+      observeEntity(onFacing)(e => (e.facing - angle).radians <= 0.01)
       
     case Me(onMe) => 
-      updateAI(world, e, onMe(e))
+      observeEntity(onMe)(identity)
       
   }
 }

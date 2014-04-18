@@ -44,6 +44,12 @@ class World private (dimensions: Dim, entityMap: SortedMap[EntityId, Entity], ne
     if (e.id == EntityId.Auto) e.replaceId(EntityId(s"[AUTO-$nextId]"))
     else e
   
+  def updateEntity(id: EntityId)(f: Entity => Entity): World = {
+    find(id).fold(this) { e => 
+      new World(dimensions, entityMap.updated(id, f(e)), nextId)
+    }
+  }
+    
   def withEntity(e: Entity) = {
     val e2 = sanitizeId(e)
     new World(dimensions, entityMap + (e2.id -> e2), nextId + 1)
