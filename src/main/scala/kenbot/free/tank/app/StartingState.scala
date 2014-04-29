@@ -12,13 +12,15 @@ import kenbot.free.tank.ai.TruceTankAI
 object StartingState {
   import Moves._
   
-  val tanks = List(
-    Tank("1", Vec(100,100)) withAI loop(for {
+  def fireAndRush: AI[Unit] = for {
       t <- findNearestTank
       _ <- aimAtTank(t)
-      _ <- fire * 3
+      _ <- fire 
       _ <- accelerate * 4
-    } yield ()),
+    } yield ()
+  
+  val tanks = List(
+    Tank("1", Vec(10,10)) withAI loop(fireAndRush),
     
     Tank("2", Vec(200, 200)) withAI loop(for {
       t <- findNearestTank
@@ -27,7 +29,7 @@ object StartingState {
     } yield ()),
     
     
-    Tank("3", Vec(400,400)) withAI loop(for {
+    Tank("3", Vec(500,400)) withAI loop(for {
       _ <- moveTo(Vec(200,200))
       _ <- fire
       _ <- moveTo(Vec(400, 200))
